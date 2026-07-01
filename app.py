@@ -35,6 +35,14 @@ def fnt(path, size):
     try:    return ImageFont.truetype(path, size)
     except: return ImageFont.load_default()
 
+def fit_text(draw, text, font_path, max_size, min_size, max_width):
+    for size in range(max_size, min_size - 1, -2):
+        f = fnt(font_path, size)
+        bb = draw.textbbox((0, 0), text, font=f)
+        if bb[2] - bb[0] <= max_width:
+            return f
+    return fnt(font_path, min_size)
+
 def gerar_criativo(foto_bytes, dados):
     t = Image.open(TEMPLATE_PATH).convert('RGBA')
 
@@ -55,21 +63,28 @@ def gerar_criativo(foto_bytes, dados):
 
     m = 22; y = RODAPE_Y + 18
 
-    # Nome do produto — mesmo estilo original (Impact 42px)
+    # Nome do produto — Impact, auto-fit até 42px para caber na coluna esquerda
+    COLW = 440  # largura disponível antes do oval
     nome = dados.get('nomeProduto', '').upper()
-    d.text((m+2,y+2), nome, font=fnt(IMPACT,42), fill=(0,0,80))
-    d.text((m,y),     nome, font=fnt(IMPACT,42), fill=BRANCO)
-    y += 48
+    f_nome = fit_text(d, nome, IMPACT, 42, 22, COLW - m)
+    bb_nome = d.textbbox((0, 0), nome, font=f_nome)
+    d.text((m+2,y+2), nome, font=f_nome, fill=(0,0,80))
+    d.text((m,y),     nome, font=f_nome, fill=BRANCO)
+    y += (bb_nome[3] - bb_nome[1]) + 8
 
     sub = dados.get('subtitulo', '')
     if sub:
-        d.text((m,y), sub.upper(), font=fnt(HELVETICA_BOLD,24), fill=BRANCO)
-        y += 30
+        f_sub = fit_text(d, sub.upper(), HELVETICA_BOLD, 24, 16, COLW - m)
+        d.text((m,y), sub.upper(), font=f_sub, fill=BRANCO)
+        bb_sub = d.textbbox((0,0), sub.upper(), font=f_sub)
+        y += (bb_sub[3]-bb_sub[1]) + 6
 
     modelo = dados.get('modelo', '')
     if modelo:
-        d.text((m,y), modelo.upper(), font=fnt(HELVETICA_BOLD,24), fill=BRANCO)
-        y += 30
+        f_mod = fit_text(d, modelo.upper(), HELVETICA_BOLD, 24, 16, COLW - m)
+        d.text((m,y), modelo.upper(), font=f_mod, fill=BRANCO)
+        bb_mod = d.textbbox((0,0), modelo.upper(), font=f_mod)
+        y += (bb_mod[3]-bb_mod[1]) + 6
     y += 4
 
     badges = dados.get('badges', [])
