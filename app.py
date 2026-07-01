@@ -39,10 +39,15 @@ def gerar_criativo(foto_bytes, dados):
     t = Image.open(TEMPLATE_PATH).convert('RGBA')
 
     foto = Image.open(io.BytesIO(foto_bytes)).convert('RGBA')
-    foto.thumbnail((FW, FH), Image.LANCZOS)
-    c = Image.new('RGBA', (FW, FH), (0,0,0,0))
-    c.paste(foto, ((FW-foto.width)//2, (FH-foto.height)//2), foto)
-    t.paste(c, (FOTO_X1, FOTO_Y1), c)
+    # crop-to-fill: preenche o frame sem deixar espaço em branco
+    ratio_w = FW / foto.width
+    ratio_h = FH / foto.height
+    ratio   = max(ratio_w, ratio_h)
+    nw, nh  = int(foto.width * ratio), int(foto.height * ratio)
+    foto    = foto.resize((nw, nh), Image.LANCZOS)
+    cx, cy  = (nw - FW) // 2, (nh - FH) // 2
+    foto    = foto.crop((cx, cy, cx + FW, cy + FH))
+    t.paste(foto, (FOTO_X1, FOTO_Y1), foto)
 
     ov = Image.new('RGBA', t.size, (0,0,0,0))
     d  = ImageDraw.Draw(ov)
@@ -85,13 +90,12 @@ def gerar_criativo(foto_bytes, dados):
     d.rounded_rectangle([OX1+10,OY1+10,OX2+10,OY2+10], radius=RAIO, fill=VERM_S)
     d.rounded_rectangle([OX1,OY1,OX2,OY2], radius=RAIO, fill=VERM)
 
-    # "12X" no topo — mesmo tamanho do "NO PIX" original (Impact 28px), centralizado
+    # "12X" topo-ESQUERDA do oval (igual referência)
     parcelas_str = dados.get('parcelas', '12X SEM JUROS')
     num_parc = parcelas_str.split('X')[0].strip()
     txt_12x = num_parc + 'X'
     f_12x = fnt(IMPACT, 28)
-    bb_12x = d.textbbox((0,0), txt_12x, font=f_12x)
-    d.text((OX2-(bb_12x[2]-bb_12x[0])-18, OY1+10), txt_12x, font=f_12x, fill=BRANCO)
+    d.text((OX1+14, OY1+10), txt_12x, font=f_12x, fill=BRANCO)
 
     # "R$" pequeno — posição idêntica ao original
     d.text((OX1+18, OCY-18), 'R$', font=fnt(IMPACT,32), fill=BRANCO)
@@ -111,10 +115,10 @@ def gerar_criativo(foto_bytes, dados):
     d.text((ix+iw+2, OY1+6), cents, font=f_c, fill=VERM_S)
     d.text((ix+iw,   OY1+4), cents, font=f_c, fill=BRANCO)
 
-    # "SEM JUROS" canto inferior direito do oval
+    # "SEM JUROS" rodapé-DIREITA do oval (igual referência)
     f_sj  = fnt(IMPACT, 28)
     bb_sj = d.textbbox((0,0), 'SEM JUROS', font=f_sj)
-    d.text((OX2-(bb_sj[2]-bb_sj[0])-18, OCY+6), 'SEM JUROS', font=f_sj, fill=AMARELO)
+    d.text((OX2-(bb_sj[2]-bb_sj[0])-18, OY2-38), 'SEM JUROS', font=f_sj, fill=AMARELO)
 
     # Abaixo do oval: preço à vista — mesmo estilo/posição do texto de parcelas original
     preco_vista = dados.get('precoOriginal', '')
@@ -142,14 +146,31 @@ def gerar():
             return jsonify({'erro': 'foto ausente'}), 400
 
         foto_bytes = foto_file.read()
+        # Suporta campo precoParcela (form novo) ou preco/centavos (n8n)
+        preco_parc_raw = request.form.get('precoParcela', '')
+        if preco_parc_raw:
+            pp = preco_parc_raw.replace('R$','').replace('.','').strip().split(',')
+            preco    = pp[0] or '0'
+            centavos = (pp[1] if len(pp) > 1 else '00').ljust(2,'0')[:2]
+        else:
+            preco    = request.form.get('preco', '0')
+            centavos = request.form.get('centavos', '00')
+
+        # Suporta precoVista (form novo) ou precoOriginal (n8n)
+        preco_vista = request.form.get('precoVista', '') or request.form.get('precoOriginal', '')
+        preco_vista = preco_vista.replace('R$','').strip()
+
+        num_parc = (request.form.get('numParcelas', '') or
+                    request.form.get('parcelas', '12X SEM JUROS').split('X')[0]).strip()
+
         dados = {
             'nomeProduto':   request.form.get('nomeProduto', ''),
             'subtitulo':     request.form.get('subtitulo', ''),
             'modelo':        request.form.get('modelo', ''),
-            'preco':         request.form.get('preco', '0'),
-            'centavos':      request.form.get('centavos', '00'),
-            'precoOriginal': request.form.get('precoOriginal', ''),
-            'parcelas':      request.form.get('parcelas', '12X SEM JUROS'),
+            'preco':         preco,
+            'centavos':      centavos,
+            'precoOriginal': preco_vista,
+            'parcelas':      num_parc + 'X SEM JUROS',
             'badges':        request.form.getlist('badges'),
         }
         if not dados['badges'] and request.form.get('badgesStr'):
