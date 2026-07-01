@@ -19,12 +19,8 @@ VERM_S  = (100,  10,   15)
 BRANCO  = (255, 255,  255)
 VERDE   = (28,  155,   50)
 
-IMPACT         = '/usr/share/fonts/truetype/msttcorefonts/Impact.ttf'
-HELVETICA_BOLD = '/usr/share/fonts/truetype/msttcorefonts/Arial_Bold.ttf'
-if not os.path.exists(IMPACT):
-    IMPACT         = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
-if not os.path.exists(HELVETICA_BOLD):
-    HELVETICA_BOLD = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
+IMPACT         = os.path.join(ASSETS_DIR, 'Impact.ttf')
+HELVETICA_BOLD = os.path.join(ASSETS_DIR, 'Helvetica.ttc')
 
 def fnt(path, size):
     try:    return ImageFont.truetype(path, size)
