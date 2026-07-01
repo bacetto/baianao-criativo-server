@@ -111,10 +111,10 @@ def gerar_criativo(foto_bytes, dados):
     d.text((ix+iw+2, OY1+6), cents, font=f_c, fill=VERM_S)
     d.text((ix+iw,   OY1+4), cents, font=f_c, fill=BRANCO)
 
-    # "SEM JUROS" no lugar do "NO PIX" — amarelo, mesmo tamanho
-    f_sj   = fnt(IMPACT, 28)
-    bb_sj  = d.textbbox((0,0), 'SEM JUROS', font=f_sj)
-    d.text((OX1+18, OCY+6), 'SEM JUROS', font=f_sj, fill=AMARELO)
+    # "SEM JUROS" canto inferior direito do oval
+    f_sj  = fnt(IMPACT, 28)
+    bb_sj = d.textbbox((0,0), 'SEM JUROS', font=f_sj)
+    d.text((OX2-(bb_sj[2]-bb_sj[0])-18, OCY+6), 'SEM JUROS', font=f_sj, fill=AMARELO)
 
     # Abaixo do oval: preço à vista — mesmo estilo/posição do texto de parcelas original
     preco_vista = dados.get('precoOriginal', '')
