@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, send_file
-import os, io, base64
+import os, io, base64, time, requests as req_lib
 from PIL import Image, ImageDraw, ImageFont
+import replicate
 
 app = Flask(__name__)
 
@@ -152,6 +153,50 @@ def gerar():
 
         buf = gerar_criativo(foto_bytes, dados)
         return send_file(buf, mimetype='image/jpeg', download_name='criativo.jpg')
+
+    except Exception as e:
+        return jsonify({'erro': str(e)}), 500
+
+@app.route('/gerar-video', methods=['POST'])
+def gerar_video():
+    try:
+        foto_file = request.files.get('foto')
+        if not foto_file:
+            return jsonify({'erro': 'foto ausente'}), 400
+
+        prompt = request.form.get('prompt', 'Product showcase video, smooth camera movement, professional lighting, elegant reveal')
+
+        # Converte foto para base64 data URL
+        foto_bytes = foto_file.read()
+        ext = foto_file.filename.rsplit('.', 1)[-1].lower() if foto_file.filename else 'jpg'
+        mime = 'image/png' if ext == 'png' else 'image/jpeg'
+        b64 = base64.b64encode(foto_bytes).decode()
+        data_url = f"data:{mime};base64,{b64}"
+
+        # Chama Wan 2.1 image-to-video no Replicate
+        output = replicate.run(
+            "wavespeedai/wan-2.1-i2v-480p",
+            input={
+                "image": data_url,
+                "prompt": prompt,
+                "num_frames": 81,
+                "sample_steps": 20,
+                "frames_per_second": 16,
+                "aspect_ratio": "9:16"
+            }
+        )
+
+        # output é uma URL do vídeo gerado
+        video_url = str(output) if isinstance(output, str) else output[0] if output else None
+        if not video_url:
+            return jsonify({'erro': 'Replicate não retornou vídeo'}), 500
+
+        # Baixa o vídeo e retorna
+        r = req_lib.get(video_url, timeout=120)
+        r.raise_for_status()
+        buf = io.BytesIO(r.content)
+        buf.seek(0)
+        return send_file(buf, mimetype='video/mp4', download_name='video.mp4')
 
     except Exception as e:
         return jsonify({'erro': str(e)}), 500
